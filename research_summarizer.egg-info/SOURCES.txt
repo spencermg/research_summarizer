@@ -1,0 +1,12 @@
+README.md
+setup.cfg
+setup.py
+research_summarizer/__init__.py
+research_summarizer/__main__.py
+research_summarizer/utils.py
+research_summarizer.egg-info/PKG-INFO
+research_summarizer.egg-info/SOURCES.txt
+research_summarizer.egg-info/dependency_links.txt
+research_summarizer.egg-info/entry_points.txt
+research_summarizer.egg-info/requires.txt
+research_summarizer.egg-info/top_level.txt

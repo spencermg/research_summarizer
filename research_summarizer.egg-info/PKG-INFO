@@ -1,0 +1,12 @@
+Metadata-Version: 2.1
+Name: research_summarizer
+Version: 1.0.0
+Summary: This project aims to use natural language processing and large language models to summarize scientific literature published during specified periods of time and covering specific topics.
+Home-page: https://github.com/spencermg/research_summarizer
+Maintainer: Stanley Louis and Spencer Grant
+Maintainer-email: spencermgrant3@gmail.com
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+Requires-Dist: feedparser
+Requires-Dist: Bio
+Requires-Dist: bs4
