@@ -13,7 +13,7 @@ setuptools.setup(
     maintainer_email="spencermgrant3@gmail.com",
     description="This project aims to use natural language processing and large language models "
                 "to summarize scientific literature published during specified periods of time "
-                "and covering specific topics.",
+                "and covering specified topics.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/spencermg/research_summarizer",
