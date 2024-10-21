@@ -4,15 +4,17 @@ def main():
     #out_dir = utils.parse_args()
     query, max_articles, email, num_days = utils.parse_args()
 
-    # Fetch abstracts according to defined search query.
+    # Fetch PubMed IDs and abstracts according to defined search query.
     pmids = utils.fetch_ids_pubtator(query, max_articles, num_days)
+
     print(f"{len(pmids)} articles found")
+    print(f"{len(set(pmids))} unique articles found")
 
-    abstracts, ids_removed = utils.fetch_abstracts_pubtator(pmids)
-    pmids = [int(pmid) for pmid in pmids if pmid not in ids_removed]
-
-    # Print the first 10 abstracts, and the total number of abstracts
-    print(f"{len(pmids)} abstracts fetched")
+    #abstracts, ids_removed = utils.fetch_abstracts_pubtator(pmids)
+    #pmids = [int(pmid) for pmid in pmids if pmid not in ids_removed]
+    
+    # Print the first 2 abstracts, and the total number of abstracts
+    #print(f"{len(pmids)} abstracts fetched")
     #utils.print_abstracts(abstracts, 2)
 
 

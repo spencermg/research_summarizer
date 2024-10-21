@@ -1,7 +1,7 @@
 import argparse
 from Bio import Entrez
 import requests
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import time
 import xml.etree.ElementTree as ET
 
@@ -51,10 +51,12 @@ def fetch_ids_pubtator(query, max_results, num_days):
     # Define the base URL for the PubTator3 search API
     pmids = []
     page = 1
+    date_end = datetime.now() - timedelta(days=7)
+    date_start = date_end - timedelta(days=num_days)
 
     while len(pmids) < max_results:
         # Send a GET request to the API
-        url = f"https://www.ncbi.nlm.nih.gov/research/pubtator3-api/search/?text={query}&page={page}&sort=_id%20desc"
+        url = f"https://www.ncbi.nlm.nih.gov/research/pubtator3-api/search/?text={query}&page={page}&sort=date%20desc"
         response = requests.get(url)
 
         # Check if the request was successful
@@ -63,7 +65,7 @@ def fetch_ids_pubtator(query, max_results, num_days):
             data = response.json()
 
             # Extract PMIDs from the response
-            pmids += [str(result['pmid']) for result in data['results']]
+            pmids += [str(result['pmid']) for result in data['results'] if (date_start <= datetime.strptime(result["date"], "%Y-%m-%dT%H:%M:%SZ") <= date_end) and str(result['pmid']) not in pmids]
 
             # Delay to comply with PubTator limits before going to the next page
             time.sleep(0.334)
