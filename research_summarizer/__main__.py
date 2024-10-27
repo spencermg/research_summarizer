@@ -1,31 +1,21 @@
 import research_summarizer.utils as utils
+import pandas as pd
 
 def main():
     #out_dir = utils.parse_args()
-    query, max_articles, email, num_days = utils.parse_args()
+    query, max_articles, num_days, pmc_id_path = utils.parse_args()
 
-    # Fetch PubMed IDs and abstracts according to defined search query.
-    pmids = utils.fetch_ids_pubtator(query, max_articles, num_days)
+    # Load valid PMIDs to filter queries.
+    valid_pmids = pd.read_csv(pmc_id_path)["PMID"].tolist()
+    valid_pmcids = pd.read_csv(pmc_id_path)["PMCID"].tolist()
+    pmids_dict = dict(zip(valid_pmids, valid_pmcids))
 
-    print(f"{len(pmids)} articles found")
-    print(f"{len(set(pmids))} unique articles found")
-
-    #abstracts, ids_removed = utils.fetch_abstracts_pubtator(pmids)
-    #pmids = [int(pmid) for pmid in pmids if pmid not in ids_removed]
+    # Fetch PubMed IDs according to defined search query.
+    pmids = utils.fetch_ids_pubtator(query, max_articles, num_days, valid_pmids)
+    print(f"{len(pmids)} PubMed IDs found")
     
-    # Print the first 2 abstracts, and the total number of abstracts
-    #print(f"{len(pmids)} abstracts fetched")
-    #utils.print_abstracts(abstracts, 2)
-
-
-    """
-    # Example of using the fetched metadata to retrieve the full text
-    full_text_links = utils.fetch_pubmed_links(pmids)
-    for article in full_text_links:
-        if article['FullTextLink']:
-            print(f"Fetching full text for: {article['Title']}")
-            article_body = utils.fetch_pubmed_fulltext(article['FullTextLink'])
-            print(article_body)
-        else:
-            print(f"No free full-text link found for article: {article['Title']}")
-    """
+    # Fetch full-text articles for each PubMed ID.
+    articles, excluded_ids = utils.fetch_full_articles(pmids, pmids_dict)
+    print(f"{len(articles)} full-text articles found")
+    print(f"Excluded articles: {excluded_ids}")
+    
