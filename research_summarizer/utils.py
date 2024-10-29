@@ -11,7 +11,7 @@ import pickle
 
 SECTIONS_OF_INTEREST = ["TITLE", "ABSTRACT", "INTRO", "CASE", "METHODS", "RESULTS", "DISCUSS", "CONCL"]
 
-def _parse_args():
+def _parse_args(parent_dir):
     """
     Store arguments passed by the user in the command line.
 
@@ -24,13 +24,13 @@ def _parse_args():
     """
 
     parser = argparse.ArgumentParser(description="Research article summarizer")
-    #parser.add_argument('--out', type=str, default="output", help="Path to directory where outputs are saved.")
+    parser.add_argument('-o', '--out', type=str, default=parent_dir, help="Path to directory where outputs are saved.")
     parser.add_argument('-m', '--max_articles', type=int, default=100, help="Maximum number of articles to retrieve")
     parser.add_argument('-d', '--num_days', type=int, default=14, help="Number of days prior to today to begin the search")
     required = parser.add_argument_group('required arguments')
     required.add_argument('-q', '--query', help='Search term used to query articles', required=True)
     args = parser.parse_args()
-    return args.query, args.max_articles, args.num_days
+    return args.out, args.query, args.max_articles, args.num_days
 
 
 def _handle_num_requests(is_peak_hours, max_articles):
@@ -149,9 +149,7 @@ def parse_articles(pmcids, articles, start_time, pbar):
     
     # Loop through each article.
     for i in range(len(pmcids)):
-        # Fetch current article. Delay to comply with NCBI restrictions (3 rps)
         url_pmc = f"https://www.ncbi.nlm.nih.gov/research/bionlp/RESTful/pmcoa.cgi/BioC_xml/{pmcids[i]}/unicode"
-
         article, start_time, pbar = parse_article(url_pmc, start_time, pbar)
         if article is not None:
             articles[pmcids[i]] = article
@@ -201,10 +199,10 @@ def parse_article(url_pmc, start_time, pbar):
                     article[section_name].append(passage.find("text").text)
             pbar.update(1)
         else:
-            return None
+            return None, start_time, pbar
 
     except:
-        return None
+        return None, start_time, pbar
 
     return article, start_time, pbar
 
@@ -223,6 +221,7 @@ def _delayed_request(url, start_time):
         Updated start time making the start of the current query.
     """
 
+    # Fetch current article. Delay to comply with NCBI restrictions (3 rps)
     time.sleep(max(1./3. - (time.time() - start_time), 0))
     start_time = time.time()
     response = requests.get(url)
