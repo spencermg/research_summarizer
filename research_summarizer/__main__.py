@@ -1,21 +1,28 @@
 import research_summarizer.utils as utils
-import pandas as pd
+from pathlib import Path
+import pickle
+from datetime import datetime, time
+import pytz
+
+PMCID_PATH = Path(__file__).resolve().parent.parent / "pmc_ids.pkl"
+EST_TIME = datetime.now(pytz.timezone("US/Eastern"))
+IS_PEAK_HOURS = EST_TIME.weekday() < 5 and time(5, 0) <= EST_TIME.time() <= time(21, 0)
+
+### TODO: Add ability for users to input their own set of PMC IDs to replace querying
+### TODO: Add impact weights for articles using PubTator scores and/or number of citations
+### TODO: Figure out why broad queries give "Error: 429"
 
 def main():
-    #out_dir = utils.parse_args()
-    query, max_articles, num_days, pmc_id_path = utils.parse_args()
+    query, max_articles, num_days = utils._parse_args()
+    max_articles = utils._handle_num_requests(IS_PEAK_HOURS, max_articles)
 
-    # Load valid PMIDs to filter queries.
-    valid_pmids = pd.read_csv(pmc_id_path)["PMID"].tolist()
-    valid_pmcids = pd.read_csv(pmc_id_path)["PMCID"].tolist()
-    pmids_dict = dict(zip(valid_pmids, valid_pmcids))
-
-    # Fetch PubMed IDs according to defined search query.
-    pmids = utils.fetch_ids_pubtator(query, max_articles, num_days, valid_pmids)
-    print(f"{len(pmids)} PubMed IDs found")
+    if not Path.exists(PMCID_PATH):
+        utils.process_pmcid_file(PMCID_PATH)
     
-    # Fetch full-text articles for each PubMed ID.
-    articles, excluded_ids = utils.fetch_full_articles(pmids, pmids_dict)
+    with open(PMCID_PATH, "rb") as f:
+        valid_pmc_ids = pickle.load(f)
+
+    # Fetch articles according to defined search query.
+    articles = utils.fetch_articles(query, max_articles, num_days, valid_pmc_ids)
     print(f"{len(articles)} full-text articles found")
-    print(f"Excluded articles: {excluded_ids}")
     
