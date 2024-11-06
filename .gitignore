@@ -13,3 +13,4 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+research_summarizer/articles.csv
