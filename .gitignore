@@ -1,2 +1,15 @@
 pmc_ids.pkl
 results*
+
+# Ignore finder files
+.DS_Store
+/.DS_Store
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
