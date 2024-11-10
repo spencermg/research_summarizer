@@ -1,8 +1,6 @@
-feedparser
-Bio
-bs4
-openai
-google-generativeai
 anthropic
+google-generativeai
+openai
+pandas
 torch
 transformers
