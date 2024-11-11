@@ -1,4 +1,3 @@
-# summarization.py
 from transformers import AutoTokenizer, pipeline
 from sentence_transformers import SentenceTransformer, util
 import torch
@@ -65,15 +64,22 @@ def sliding_window_summarization(
         # Compute sentence embedding for redundancy checking
         summary_embedding = sentence_model.encode(summary)
 
+        # Convert summary_embedding to a PyTorch tensor
+        summary_embedding = torch.tensor(summary_embedding).clone().detach()
+
         # Redundancy reduction using sentence embeddings
         if previous_summary_embedding is not None:
-            # Normalize embeddings before calculating cosine similarity
-            summary_embedding = summary_embedding / torch.norm(summary_embedding)
-            previous_summary_embedding = previous_summary_embedding / torch.norm(
-                previous_summary_embedding
+            # Convert previous_summary_embedding to a PyTorch tensor if it is not already
+            previous_summary_embedding = (
+                torch.tensor(previous_summary_embedding).clone().detach()
             )
 
-            similarity = util.cos_sim(summary_embedding, previous_summary_embedding)
+            # Normalize embeddings before calculating cosine similarity
+            similarity = util.cos_sim(
+                summary_embedding / summary_embedding.norm(),
+                previous_summary_embedding / previous_summary_embedding.norm(),
+            )
+
             if similarity > redundancy_threshold:
                 print(
                     f"Skipping redundant summary (similarity {similarity.item():.3f})"

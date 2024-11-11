@@ -16,3 +16,8 @@ venv.bak/
 
 # Others
 research_summarizer/articles.csv
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+research_summarizer/.gradio/certificate.pem
