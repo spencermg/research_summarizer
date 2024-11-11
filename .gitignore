@@ -1,5 +1,8 @@
 pmc_ids.pkl
 results*
+research_summarizer/__pycache__/__main__.cpython-311.pyc
+research_summarizer/__pycache__/utils.cpython-311.pyc
+research_summarizer/__pycache__/model.cpython-311.pyc
 
 # Ignore finder files
 .DS_Store

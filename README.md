@@ -2,7 +2,9 @@
 
 ## Table of Contents 
 #### [1. Background](#background)
-#### [2. References](#references)
+#### [2. Installation](#installation)
+#### [3. Examples](#examples)
+#### [4. References](#references)
 
 
 <a id="background"></a>
@@ -44,8 +46,54 @@ We will utilize the following APIs to access research papers and their metadata:
 This project will provide a valuable resource for healthcare professionals, enabling them to efficiently stay abreast of the latest advancements in their field.
 
 
+<a id="installation"></a>
+## **Installation**
+
+Before installation, ensure you have Python and Anaconda installed on your computer. Once both are installed, open a command line interface and clone this repository directly from github:
+
+`git clone https://github.com/spencermg/research_summarizer.git`
+
+Once cloned, navigate to the research_summarizer directory...
+
+- On Mac/Linux:
+
+`cd path_to_research_summarizer_directory`
+
+- On Windows:
+
+`chdir path_to_research_summarizer_directory`
+
+After navigating to the research_summarizer directory, create an anaconda environment using Python 3.11 and install dependencies:
+
+```shell
+# Create the anaconda environment
+conda create -n research_summarizer python==3.11
+
+# Activate the environment you just created
+conda activate research_summarizer
+
+# Install dependencies
+pip install ./
+```
+
+<a id="examples"></a>
+## **Examples**
+
+You are now ready to generate summaries of recent advancements in the scientific literature! Here are a few examples of how can run this program:
+
+```shell
+# Summarize up to 5 Alzheimer's genomics articles over the last 7 days using pretrained transformer models
+summarize -q "Alzheimers genomics" -d 7 -m 5
+
+# Summarize up to 10 lung histology articles over the last 3 days using pretrained transformer models and save outputs to the summarization_results directory on your Desktop
+summarize -q "Lung histology" -d 3 -m 10 -o Desktop/summarization_results
+
+# Summarize up to 20 cancer immunotherapy articles over the last 30 days using both pretrained transformer models and LLM models
+summarize -q "Cancer immunotherapy" -d 30 -m 20 --openai_key your_openai_key --anthropic_key your_anthropic_key --gemini_key your_gemini_key
+```
+
 <a id="referenecs"></a>
-## References
+## **References**
 
 1. https://www.ncbi.nlm.nih.gov/pmc/about/guidelines/ 
 2. https://info.arxiv.org/about/index.html
