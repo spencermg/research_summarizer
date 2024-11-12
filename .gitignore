@@ -1,8 +1,8 @@
 pmc_ids.pkl
 results*
-research_summarizer/__pycache__/__main__.cpython-311.pyc
-research_summarizer/__pycache__/utils.cpython-311.pyc
-research_summarizer/__pycache__/model.cpython-311.pyc
+research_summarizer/__pycache__/*
+research_summarizer/train_dir
+research_summarization_model
 
 # Ignore finder files
 .DS_Store
@@ -18,9 +18,10 @@ env.bak/
 venv.bak/
 
 # Others
-research_summarizer/articles.csv
+# research_summarizer/articles.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 research_summarizer/.gradio/certificate.pem
+research_summarizer/__pycache__/summarization.cpython-311.pyc
