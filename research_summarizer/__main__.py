@@ -25,7 +25,6 @@ def main():
 
     if not Path.exists(PMCID_PATH):
         utils.process_pmcid_file(PMCID_PATH)
-    
     with open(PMCID_PATH, "rb") as f:
         valid_pmc_ids = pickle.load(f)
 
@@ -35,10 +34,12 @@ def main():
 
     df_articles = utils._combine_article_sections(dict_articles)
     device = utils.find_device()
-    df_summaries, df_abstracts = utils.summarize_articles(df_articles, device, summarizer)
+    print(df_articles.head())
 
+    system_message = "You are an AI assistant tasked with summarizing articles. Your goal is to provide a concise, accurate, and informative summary of the key points in the given article text. Focus on capturing the main ideas, key findings, and important conclusions. Avoid including unnecessary details or tangents. The summary should be approximately 1-2 paragraphs in length."
+    df_summaries, df_abstracts = utils.summarize_articles(df_articles, device, summarizer, system_message)
     print(df_summaries.head())
-    print(df_abstracts.head())    
+    print(df_abstracts.head())
     
 
 

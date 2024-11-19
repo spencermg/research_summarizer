@@ -10,6 +10,7 @@ import pandas as pd
 import pickle
 import torch
 
+
 SECTIONS_OF_INTEREST = ["TITLE", "ABSTRACT", "INTRO", "CASE", "METHODS", "RESULTS", "DISCUSS", "CONCL"]
 
 
@@ -285,7 +286,7 @@ def find_device():
     return device
 
 
-def summarize_articles(df_articles, device, summarizer):
+def summarize_articles(df_articles, device, summarizer, system_message):
     """
     Summarize a full-text article using various NLP/LLM models
 
@@ -293,6 +294,7 @@ def summarize_articles(df_articles, device, summarizer):
         df_articles (pandas.DataFrame): Dataframe containing PMCIDs and corresponding full-text articles.
         device (int): 0 if using GPUs, otherwise -1
         summarizer (research_summarizer.model.llm_summarizer): Summarizer object 
+        system_message (str): Prompt to provide instructions for LLMs
 
     :return: summaries *(dict)*: \n
         Mapping from PMCIDs to dictionary with summaries from each model
@@ -303,14 +305,19 @@ def summarize_articles(df_articles, device, summarizer):
     summaries = {}
     abstracts = {}
     for _, df_article in df_articles.iterrows():
-        summaries[df_article['pmcid']] = _summarize_article(df_article['full_text'], device, summarizer)
-        abstracts[df_article['pmcid']] = df_article['abstract']
+        summaries[df_article['pmcid']] = _summarize_article(
+            df_article['full_text'], 
+            device, 
+            summarizer, 
+            system_message,
+        )
+        abstracts[df_article['pmcid']] = [df_article['abstract']]
     df_summaries = pd.DataFrame(summaries)
     df_abstracts = pd.DataFrame(abstracts)
     return df_summaries, df_abstracts
 
 
-def _summarize_article(article_text, device, summarizer):
+def _summarize_article(article_text, device, summarizer, system_message):
     """
     Summarize a full-text article using various NLP/LLM models
 
@@ -318,21 +325,17 @@ def _summarize_article(article_text, device, summarizer):
         article_text (str): Full text from an article
         device (int): 0 if using GPUs, otherwise -1
         summarizer (research_summarizer.model.llm_summarizer): Summarizer object 
+        system_message (str): Prompt to provide instructions for LLMs
 
     :return: summaries *(str)*: \n
         Summarization of the full-text article
     """
 
     summaries = {}
-
-    system_message = "You are an AI assistant tasked with summarizing articles. Your goal is to provide a concise, accurate, and informative summary of the key points in the given article text. Focus on capturing the main ideas, key findings, and important conclusions. Avoid including unnecessary details or tangents. The summary should be approximately 1-2 paragraphs in length."
-
-    print("Bart")
     summaries = summarizer.summarize_bart(article_text, summaries, device)
     summaries = summarizer.summarize_falcons(article_text, summaries, device)
     summaries = summarizer.summarize_bigbird(article_text, summaries, device)
     summaries = summarizer.summarize_gpt(article_text, system_message, summaries)
     summaries = summarizer.summarize_anthropic(article_text, system_message, summaries)
     summaries = summarizer.summarize_gemini(article_text, system_message, summaries)
-
     return summaries

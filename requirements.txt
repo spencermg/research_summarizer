@@ -4,3 +4,4 @@ openai
 pandas
 torch
 transformers
+sentence-transformers
