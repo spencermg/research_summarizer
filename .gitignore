@@ -3,7 +3,7 @@ results*
 research_summarizer/__pycache__/*
 research_summarizer/train_dir
 research_summarization_model
-
+research_summarization_model_bart
 # Ignore finder files
 .DS_Store
 /.DS_Store
