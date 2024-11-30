@@ -1,7 +1,9 @@
 anthropic
 google-generativeai
+matplotlib
 openai
 pandas
 torch
 transformers
+seaborn
 sentence-transformers

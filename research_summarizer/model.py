@@ -4,6 +4,12 @@ import anthropic
 from transformers import pipeline
 from transformers import AutoTokenizer, pipeline
 
+import pandas as pd
+import tqdm
+from datasets import Dataset, DatasetDict
+from sklearn.model_selection import train_test_split
+from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer
+
 
 class llm_summarizer:
     def __init__(self, openai_key, anthropic_key, gemini_key):
@@ -202,26 +208,11 @@ def summarize_text(model_name, device, article_text, max_length, overlap=128, su
     )
 
     # Generate summary
-    summary = sliding_window_summarization(
-        text = article_text,
-        tokenizer = tokenizer,
-        pipe = summarization_pipeline,
-        max_length = max_length,
-        overlap = overlap,
-        summary_length = summary_length,
-    )
-
+    summary = sliding_window_summarization(article_text, tokenizer, summarization_pipeline, max_length, overlap, summary_length)
     return summary
 
 
-def sliding_window_summarization(
-    text: str,
-    tokenizer: AutoTokenizer,
-    pipe: pipeline,
-    max_length: int = 512,
-    overlap: int = 128,
-    summary_length: int = 900,
-) -> str:
+def sliding_window_summarization(text, tokenizer, pipe, max_length, overlap, summary_length):
     """
     Summarizes a long text using a sliding window approach with overlap and
     redundancy reduction.
@@ -284,4 +275,91 @@ def sliding_window_summarization(
         max_length,
         0,
         summary_length,
+    )
+
+
+def fine_tune_transformer(model_name, df_articles, device, results_dir, overlap=128, summary_length=250):
+    """
+    
+    """
+
+    print("Generating summaries for fine-tuned transformer model...")
+    train_df, test_df = train_test_split(df_articles, test_size=0.2, random_state=42)
+    train_dataset = Dataset.from_pandas(train_df)
+    test_dataset = Dataset.from_pandas(test_df)
+    dataset = DatasetDict({"train": train_dataset, "test": test_dataset})
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
+
+    tokenized_articles = dataset.map(lambda batch: tokenize_batch(batch, max_length=512), batched=True, batch_size=None)
+
+    args = TrainingArguments(
+        num_train_epochs=1,
+        per_device_train_batch_size=4,
+        per_device_eval_batch_size=4,
+        eval_strategy='epoch',
+        save_strategy='epoch',
+        weight_decay=0.01,
+        learning_rate=2e-5,
+    )
+    trainer = Trainer(
+        model=model,
+        args=args,
+        tokenizer=tokenizer,
+        data_collator=DataCollatorForSeq2Seq(tokenizer, model=model),
+        train_dataset=tokenized_articles['train'],
+        eval_dataset=tokenized_articles['test'],
+    )
+    trainer.train()
+    model.save_pretrained(results_dir / "tuned_model.json")
+    model = AutoModelForSeq2SeqLM.from_pretrained(results_dir / "tuned_model.json").to(device)
+    summarization_pipeline = pipeline("summarization", model=model, device=device)
+
+    summaries = {}
+    abstracts = {}
+    for _, df_article in tqdm(df_articles.iterrows(), total=len(df_articles), desc="Summarizing articles after fine-tuning"):
+        summaries[df_article['pmcid']] = [sliding_window_summarization(
+            text = df_articles["full_text"],
+            tokenizer = tokenizer,
+            pipe = summarization_pipeline,
+            max_length = 512,
+            overlap = overlap,
+            summary_length = summary_length,
+        )]
+        abstracts[df_article['pmcid']] = [df_article['abstract']]
+    
+    df_summaries = pd.DataFrame(summaries)
+    df_abstracts = pd.DataFrame(abstracts)
+    print("Article summaries generated for fine-tuned transformer model!")
+    return df_summaries, df_abstracts
+
+'''
+def fine_tune_llm(model_name):
+    return
+'''
+
+### TODO: Add this in original functionality?
+def tokenize_batch(batch, tokenizer, max_length=512, padding="max_length", return_tensors="pt"):
+    """
+    Tokenizes the input and target text from the batch using the specified tokenizer.
+
+    Args:
+        batch (dict): A dictionary containing the input and target text with keys for full text and abstract
+        tokenizer: 
+        max_length (int, optional): The maximum length of the tokenized sequences (Default: 1024)
+        padding (str, optional): Padding strategy (Default: "max_length")
+        return_tensors (str, optional): The type of tensors to return (Default: "pt")
+
+    :return: encoding *(dict)*: \n
+        The tokenized and encoded representations of the input and target texts
+    """
+
+    return tokenizer(
+        batch["full_text"],
+        text_target=batch["abstract"],
+        max_length=max_length,
+        truncation=True,
+        padding=padding,
+        return_tensors=return_tensors,
     )
