@@ -123,7 +123,7 @@ def _summarize_article(article_text, device, summarizer, system_message):
     summaries = summarizer.summarize_bart(article_text, summaries, device)
     summaries = summarizer.summarize_falcons(article_text, summaries, device)
     summaries = summarizer.summarize_bigbird(article_text, summaries, device)
-    #summaries = summarizer.summarize_gpt(article_text, system_message, summaries)
-    #summaries = summarizer.summarize_anthropic(article_text, system_message, summaries)
-    #summaries = summarizer.summarize_gemini(article_text, system_message, summaries)
+    summaries = summarizer.summarize_llm(article_text, system_message, summaries, "Llama")
+    summaries = summarizer.summarize_llm(article_text, system_message, summaries, "Gemma")
+    summaries = summarizer.summarize_llm(article_text, system_message, summaries, "Phi3")
     return summaries

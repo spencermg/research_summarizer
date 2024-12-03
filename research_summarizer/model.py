@@ -1,15 +1,17 @@
-from openai import OpenAI
-import google.generativeai as genai
 import anthropic
-from transformers import pipeline
-from transformers import AutoTokenizer, pipeline
-
+import google.generativeai as genai
+import ollama
 import pandas as pd
-import tqdm
 from datasets import Dataset, DatasetDict
+from openai import OpenAI
 from sklearn.model_selection import train_test_split
-from transformers import AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer
+from transformers import pipeline, AutoTokenizer, pipeline, AutoModelForSeq2SeqLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer
+from tqdm import tqdm
 
+client = ollama.Client()
+client.pull("llama3.2")
+client.pull("gemma2")
+client.pull("phi3:medium-128k")
 
 class llm_summarizer:
     def __init__(self, openai_key, anthropic_key, gemini_key):
@@ -99,88 +101,33 @@ class llm_summarizer:
 
         return summaries
 
-    def summarize_gpt(self, article_text, system_message, summaries):
+    def summarize_llm(self, article_text, system_message, summaries, model_name):
         """
         Sends an article to the OpenAI API to generate a summary.
 
         Args:
-            article_text (str): The full text of the article to be summarized.
-            system_message (str): Prompt to indicate what the LLM should do.
-            summaries (dict): Summaries for each LLM model.
+            article_text (str): The full text of the article to be summarized
+            system_message (str): Prompt to indicate what the LLM should do
+            summaries (dict): Summaries for each LLM model
+            model_name (str): Name of LLM model being used
 
         :return: summaries *(str)*: \n
-            Summaries from each model.
+            Summaries from each model
         """
 
-        if self.openai_key != "":
-            messages = [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": article_text},
-            ]
-            response = self.openai.chat.completions.create(
-                model = "gpt-4o-mini", 
-                messages = messages, 
-                stream = False
-            )
-            summary = response.choices[0].message.content
-            summaries["OpenAI"] = summary
-            return summaries
-        else:
-            return summaries
+        model_dict = {
+            "Llama":"llama3.2",
+            "Gemma":"gemma2",
+            "Phi3":"phi3:medium-128k",
+        }
 
-    def summarize_claude(self, article_text, system_message, summaries):
-        """
-        Sends an article to the Anthropic API to generate a summary.
-
-        Args:
-            article_text (str): The full text of the article to be summarized.
-            system_message (str): Prompt to indicate what the LLM should do.
-            summaries (dict): Summaries for each LLM model.
-
-        :return: summaries *(str)*: \n
-            Summaries from each model.
-        """
-
-        if self.anthropic_key != "":
-            try:
-                response = self.claude.messages.create(
-                    model = "claude-3-haiku-20240307",
-                    max_tokens = 1000,
-                    system = system_message,
-                    messages = [{"role": "user", "content": article_text}],
-                )
-                summary = response.content[0].text
-                summaries["Anthropic"] = summary
-                return summaries
-            except Exception as e:
-                raise Exception(f"Error summarizing article: {e}")
-        else:
-            return summaries
-        
-    def gemini(self, article_text, system_message, summaries):
-        """
-        Sends an article to the Gemini API to generate a summary.
-
-        Args:
-            article_text (str): The full text of the article to be summarized.
-            system_message (str): Prompt to indicate what the LLM should do.
-            summaries (dict): Summaries for each LLM model.
-
-        :return: summaries *(str)*: \n
-            Summaries from each model.
-        """
-
-        if self.gemini_key != "":
-            gemini = genai.GenerativeModel(
-                model_name = 'gemini-1.5-flash',
-                system_instruction = system_message,
-            )
-            response = gemini.generate_content(article_text)
-            summary = response.candidates[0].content.parts[0].text
-            summaries["Gemini"] = summary
-            return summaries
-        else:
-            return summaries
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": article_text},
+        ]
+        summary = ollama.chat(model=model_dict[model_name], messages=messages)['message']['content']
+        summaries[model_name] = summary
+        return summaries
 
 
 def summarize_text(model_name, device, article_text, max_length, overlap=128, summary_length=250):
@@ -280,8 +227,26 @@ def sliding_window_summarization(text, tokenizer, pipe, max_length, overlap, sum
 
 def fine_tune_transformer(model_name, df_articles, device, results_dir, overlap=128, summary_length=250):
     """
-    
+    Fine tune one of the pretrained transformer models
+
+    Args:
+        model_name_transformer (str): Name of the best-performing transformer model
+        df_articles (pandas.DataFrame): Dataframe containing PMCIDs and corresponding full-text articles
+        device (int): 0 if using GPUs, otherwise -1
+        results_dir (pathlib.Path): Path to directory where outputs are saved
+        overlap (int, optional): The overlap between consecutive chunks.
+        summary_length (int, optional): The desired length of the summary.
+
+    :return: df_summaries (pandas.DataFrame): \n
+        Mapping from PMCIDs to summaries from the new fine-tuned model
     """
+
+    model_dict = {
+        "Bart":"facebook/bart-large-cnn", 
+        "Falconsai":"Falconsai/medical_summarization", 
+        "BigBird":"google/bigbird-pegasus-large-pubmed",
+    }
+    model_name = model_dict[model_name]
 
     print("Generating summaries for fine-tuned transformer model...")
     train_df, test_df = train_test_split(df_articles, test_size=0.2, random_state=42)
@@ -292,9 +257,10 @@ def fine_tune_transformer(model_name, df_articles, device, results_dir, overlap=
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name).to(device)
 
-    tokenized_articles = dataset.map(lambda batch: tokenize_batch(batch, max_length=512), batched=True, batch_size=None)
+    tokenized_articles = dataset.map(lambda batch: tokenize_batch(batch, tokenizer), batched=True, batch_size=None)
 
     args = TrainingArguments(
+        output_dir=results_dir,
         num_train_epochs=1,
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
@@ -317,37 +283,29 @@ def fine_tune_transformer(model_name, df_articles, device, results_dir, overlap=
     summarization_pipeline = pipeline("summarization", model=model, device=device)
 
     summaries = {}
-    abstracts = {}
     for _, df_article in tqdm(df_articles.iterrows(), total=len(df_articles), desc="Summarizing articles after fine-tuning"):
         summaries[df_article['pmcid']] = [sliding_window_summarization(
-            text = df_articles["full_text"],
+            text = df_article["full_text"],
             tokenizer = tokenizer,
             pipe = summarization_pipeline,
             max_length = 512,
             overlap = overlap,
             summary_length = summary_length,
         )]
-        abstracts[df_article['pmcid']] = [df_article['abstract']]
     
     df_summaries = pd.DataFrame(summaries)
-    df_abstracts = pd.DataFrame(abstracts)
     print("Article summaries generated for fine-tuned transformer model!")
-    return df_summaries, df_abstracts
+    return df_summaries
 
-'''
-def fine_tune_llm(model_name):
-    return
-'''
 
-### TODO: Add this in original functionality?
 def tokenize_batch(batch, tokenizer, max_length=512, padding="max_length", return_tensors="pt"):
     """
     Tokenizes the input and target text from the batch using the specified tokenizer.
 
     Args:
         batch (dict): A dictionary containing the input and target text with keys for full text and abstract
-        tokenizer: 
-        max_length (int, optional): The maximum length of the tokenized sequences (Default: 1024)
+        tokenizer (transformers.AutoTokenizer): Model being used to tokenize text
+        max_length (int, optional): The maximum length of the tokenized sequences (Default: 512)
         padding (str, optional): Padding strategy (Default: "max_length")
         return_tensors (str, optional): The type of tensors to return (Default: "pt")
 

@@ -8,10 +8,10 @@ import requests
 import research_summarizer.utils as utils
 import research_summarizer.model as model
 import seaborn as sns
-import time
+import time as time_module
 import torch
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from io import BytesIO
 from pathlib import Path
 from sentence_transformers import SentenceTransformer, util as transformer_util
@@ -27,7 +27,7 @@ warnings.filterwarnings("ignore")
 ### TODO: Add ability for users to input their own set of PMC IDs to replace querying
 ### TODO: Add impact weights for articles using PubTator scores and/or number of citations
 ### TODO: Figure out why broad queries give "Error: 429"
-### TODO: Use tags when applicable
+### TODO: Use tags when applicable for Pubtator
 ### TODO: Save summaries to txt file
 ### TODO: Give option to go through fine tuning process (generate accuracy metrics, use all models) or not (add path to pretrained model)
 
@@ -48,21 +48,17 @@ def main():
 
     dict_articles = fetch_articles(query, max_articles, num_days, valid_pmc_ids)
     df_articles = _combine_article_sections(dict_articles)
-    print(df_articles)
     df_summaries, df_abstracts = summarize_articles(df_articles, device, summarizer, system_message)
     df_accuracies = quantify_accuracy(df_summaries, df_abstracts, results_dir)
     plot_accuracies(df_accuracies, results_dir)
-    model_name_transformer = find_best_models(df_accuracies)
-    print(model_name_transformer)
-    #model_name_transformer, model_name_llm = find_best_models(df_accuracies)
-    df_summaries_transformer, df_abstracts_transformer = model.fine_tune_transformer(model_name_transformer, df_articles, device, results_dir)
-    #df_summaries_llm, df_abstracts_llm = model.fine_tune_llm(model_name_llm, df_articles, device, results_dir)
-    df_accuracies_transformer_finetune = quantify_accuracy(df_summaries_transformer, df_abstracts_transformer, results_dir, finetune=True)
-    print(df_accuracies_transformer_finetune.head())
+
+    model_name_transformer, model_name_llm = find_best_models(df_accuracies)
+    print(f"Best-performing transformer model: {model_name_transformer}")
+    print(f"Best-performing LLM model:         {model_name_llm}")
+
+    df_summaries_transformer = fine_tune(model_name_transformer, df_articles, device, results_dir)
+    df_accuracies_transformer_finetune = quantify_accuracy(df_summaries_transformer, df_articles["abstract"], results_dir, finetune=True)
     plot_accuracies(df_accuracies_transformer_finetune, results_dir, finetune=True)
-    #df_accuracies_llm_finetune = quantify_accuracy(df_summaries_llm, df_abstracts_llm)
-    #df_accuracies_finetune = pd.concat([df_accuracies_transformer_finetune, df_accuracies_llm_finetune], axis=0)
-    #plot_accuracies(df_accuracies_finetune, results_dir, finetune=True)
 
 
 def _parse_args(parent_dir):
@@ -149,7 +145,7 @@ def fetch_articles(query, max_articles, num_days, valid_pmc_ids):
     page = 1
     date_end = datetime.now() - timedelta(days=0)
     date_start = date_end - timedelta(days=num_days)
-    start_time = time.time()
+    start_time = time_module.time()
 
     with tqdm(total=max_articles, desc="Fetching PMCIDs") as pbar:
         while len(articles) < max_articles:
@@ -253,10 +249,10 @@ def summarize_articles(df_articles, device, summarizer, system_message):
         summarizer (research_summarizer.model.llm_summarizer): Summarizer object 
         system_message (str): Prompt to provide instructions for LLMs
 
-    :return: summaries *(dict)*: \n
-        Mapping from PMCIDs to dictionary with summaries from each model
-    :return: abstracts *(dict)*: \n
-        Mapping from PMCIDs to corresponding abstracts
+    :return: summaries *(pandas.DataFrame)*: \n
+        Dataframe containing PMCIDs and summaries from each model
+    :return: abstracts *(pandas.DataFrame)*: \n
+        Dataframe containing PMCIDs and corresponding abstracts
     """
 
     print("Generating summaries for each article now...")
@@ -353,8 +349,35 @@ def find_best_models(df_accuracies):
 
     df_accuracies["Average"] = df_accuracies.mean(axis=1)
     df_accuracies = df_accuracies.sort_values(by="Average", ascending=False)
-    df_accuracies_transformer = df_accuracies.loc[["Bart", "Falconsai", "BigBird"]]
-    #df_accuracies_llm = df_accuracies.loc[["OpenAI", "Anthropic", "Gemini"]]
-    model_name_transformer = df_accuracies_transformer.index[0]
-    #model_name_llm = df_accuracies_llm.index[0]
-    return model_name_transformer#, model_name_llm
+
+    try:
+        df_accuracies_transformer = df_accuracies.loc[df_accuracies.index.isin(["Bart", "Falconsai", "BigBird"])]
+        model_name_transformer = df_accuracies_transformer.index[0]
+    except:
+        model_name_transformer = ""
+
+    try:
+        df_accuracies_llm = df_accuracies.loc[df_accuracies.index.isin(["Llama", "Gemma", "Phi3"])]
+        model_name_llm = df_accuracies_llm.index[0]
+    except:
+        model_name_llm = ""
+
+    return model_name_transformer, model_name_llm
+
+
+def fine_tune(model_name_transformer, df_articles, device, results_dir):
+    """
+    Fine-tune best-performing pretrained models using article abstracts
+
+    Args:
+        model_name_transformer (str): Name of the best-performing transformer model
+        df_articles (pandas.DataFrame): Dataframe containing PMCIDs and corresponding full-text articles
+        device (int): 0 if using GPUs, otherwise -1
+        results_dir (pathlib.Path): Path to directory where outputs are saved
+
+    :return: df_summaries_transformer *(pandas.DataFrame)*: \n
+        Mapping from PMCIDs to summaries from the new fine-tuned model
+    """
+
+    df_summaries_transformer = model.fine_tune_transformer(model_name_transformer, df_articles, device, results_dir)
+    return df_summaries_transformer
